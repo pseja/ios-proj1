@@ -1,0 +1,18 @@
+#!/bin/sh
+
+export POSIXLY_CORRECT=yes
+export LC_NUMERIC=en_US.UTF-8
+
+print_help() {
+    echo "Usage: xtf [-h|--help] [FILTER] [COMMAND] USER LOG [LOG2 [...]"
+    echo "-h|--help - shows help"
+    echo "FILTERS: "
+    echo "    -a DATETIME"
+    echo "    -b DATETIME"
+    echo "    -c CURRENCY"
+    echo "COMMANDS: "
+    echo "    list"
+    echo "    list-currency"
+    echo "    status"
+    echo "    profit"
+}
