@@ -16,3 +16,54 @@ print_help() {
     echo "    status"
     echo "    profit"
 }
+
+FILTER=""
+COMMAND=""
+USER=""
+LOGS=""
+ZIPPED_LOGS=""
+
+while [ "$#" -gt 0 ]; do
+    case "$1" in
+
+    -h | --help)
+        print_help
+        exit 0
+        ;;
+
+    -a | -b | -c)
+        FILTER="$1 $2"
+        shift 2
+        ;;
+
+    list | list-currency | status | profit)
+        COMMAND="$1"
+        shift
+        ;;
+
+    *.log | *.log.gz)
+        while [ "$#" -gt 0 ]; do
+            case "$1" in
+            *.gz)
+                ZIPPED_LOGS="$1 $ZIPPED_LOGS"
+                ;;
+            *)
+                LOGS="$1 $LOGS"
+                ;;
+            esac
+            shift
+        done
+        ;;
+
+    *)
+        USER="$1"
+        shift
+        ;;
+    esac
+done
+
+echo "filter = $FILTER"
+echo "command = $COMMAND"
+echo "user = $USER"
+echo "logs = $LOGS"
+echo "zips = $ZIPPED_LOGS"
