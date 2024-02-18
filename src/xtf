@@ -17,13 +17,6 @@ print_help() {
     echo "    profit"
 }
 
-# getopts nepouzivat protoze kdyz neuvidi prvni validni argument tak se ukonci
-#        ale vstupy muzou byt v libovolnym poradi
-
-#READ_INPUT_LOGS="gzip -d -c $GZIP | cat $LOGS - | sort"
-
-#READ_FILTERED="eval $READ_INPUT_LOGS | awk -F ';' '(\$1 > $AFTER_TIME &&) {print \$0}' | grep "
-
 FILTER=""
 COMMAND=""
 USER=""
@@ -121,16 +114,67 @@ echo "CURRENCY: $CURRENCY;"
 LIST=$(echo "$LOG_INPUT" | awk -F ";" "{if (\$1 == \"$USER\") {printf \"%s\n\", \$0}}")
 
 if [ -n "$AFTER_TIME" ]; then
-    echo "after time neni prazdny"
-    LIST=$(echo "$LIST" | awk -F ";" -v after_time="$AFTER_TIME" '{if ($2 > after_time) {printf "%s\n", $0}}')
+    LIST=$(echo "$LIST" | awk -F ";" -v after_time="$AFTER_TIME" '{
+        if ($2 > after_time)
+        {
+            printf "%s\n", $0
+        }
+    }')
 fi
 
 if [ -n "$BEFORE_TIME" ]; then
-    echo "before time neni prazdny"
-    LIST=$(echo "$LIST" | awk -F ";" -v before_time="$BEFORE_TIME" '{if ($1 == user && $2 < before_time) {printf "%s\n", $0}}')
+    LIST=$(echo "$LIST" | awk -F ";" -v before_time="$BEFORE_TIME" '{
+        if ($1 == user && $2 < before_time)
+        {
+            printf "%s\n", $0
+        }
+    }')
 fi
 
 if [ -n "$CURRENCY" ]; then
-    echo "currency neni prazdny"
-    LIST=$(echo "$LIST" | awk -F ";" -v currency="$CURRENCY" 'BEGIN {split(currency, currencies, " ")} {for (i in currencies) {if ($3 == currencies[i]) {printf "%s\n", $0; break}}}')
+    LIST=$(echo "$LIST" | awk -F ";" -v currency="$CURRENCY" 'BEGIN {
+        split(currency, currencies, " ")
+    }
+    {
+        for (i in currencies)
+        {
+            if ($3 == currencies[i])
+            {
+                printf "%s\n", $0; break
+            }
+        }
+    }')
 fi
+
+XTF_PROFIT=20
+
+case "$COMMAND" in
+"list" | "")
+    echo "$LIST"
+    ;;
+"list-currency")
+    echo "$LIST" | awk -F ";" "{print \$3}" | sort | uniq
+    ;;
+"status")
+    echo "$LIST" | awk -F ";" "{
+        currencies[\$3] += \$4
+        }
+        END {
+            for (currency in currencies)
+            {
+                printf \"%s : %.4f\n\", currency, currencies[currency] | \"sort\"
+            }
+    }"
+    ;;
+"profit")
+    echo "$LIST" | awk -F ";" -v xtf_profit="$XTF_PROFIT" "{
+        currencies[\$3] += (\$4 > 0) ? (\$4 + (\$4 * xtf_profit / 100)) : \$4
+        }
+        END {
+            for (currency in currencies)
+            {
+                printf \"%s : %.4f\n\", currency, currencies[currency] | \"sort\"
+            }
+    }"
+    ;;
+esac
