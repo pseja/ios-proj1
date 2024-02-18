@@ -86,3 +86,34 @@ for gz_log in $ZIPPED_LOGS; do
         LOG_INPUT="${LOG_INPUT}\n$(gzip -d -c "$gz_log")"
     fi
 done
+
+AFTER_TIME=$(echo "$FILTER" | awk -F ' ' '{
+    for (i=1; i<=NF; i++)
+        if ($i == "-a")
+        {
+            printf $(i+1) " " $(i+2)
+        }
+    }')
+
+BEFORE_TIME=$(echo "$FILTER" | awk -F ' ' '{
+    for (i=1; i<=NF; i++)
+        if ($i == "-b")
+        {
+            printf $(i+1) " " $(i+2)
+        }
+    }')
+
+CURRENCY=$(echo "$FILTER" | awk -F ' ' '{
+    for (i=1; i<=NF; i++)
+        if ($i == "-c")
+        {
+            currencies = (currencies == "") ? $(i+1) : currencies " " $(i+1)
+        }
+    }
+    END {
+        print currencies
+    }')
+
+echo "AFTER_TIME: $AFTER_TIME;"
+echo "BEFORE_TIME: $BEFORE_TIME;"
+echo "CURRENCY: $CURRENCY;"
