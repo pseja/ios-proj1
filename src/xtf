@@ -34,6 +34,7 @@ ZIPPED_LOGS=""
 
 COMMAND_COUNTER=0
 
+# parsing arguments
 while [ "$#" -gt 0 ]; do
     case "$1" in
     -h | --help)
@@ -83,6 +84,12 @@ while [ "$#" -gt 0 ]; do
     esac
 done
 
+if [ -z "$USER" ]; then
+    echo "No user specified." >&2
+    exit 3
+fi
+
+# put all logs into a single LOG_INPUT variable
 for log in $LOGS; do
     if [ -f "$log" ]; then
         LOG_INPUT="${LOG_INPUT}$(cat "$log")"
@@ -95,33 +102,36 @@ for gz_log in $ZIPPED_LOGS; do
     fi
 done
 
-AFTER_TIME=$(echo "$FILTER" | awk -F ' ' '{
-    for (i=1; i<=NF; i++)
-        if ($i == "-a")
+# separate filters into their respective variables
+AFTER_TIME=$(echo "$FILTER" | awk -F " " "{
+    for (i = 1; i <= NF; i++)
+        if (\$i == \"-a\")
         {
-            printf $(i+1) " " $(i+2)
+            printf \$(i+1) \" \" \$(i+2)
         }
-    }')
+    }")
 
-BEFORE_TIME=$(echo "$FILTER" | awk -F ' ' '{
-    for (i=1; i<=NF; i++)
-        if ($i == "-b")
+BEFORE_TIME=$(echo "$FILTER" | awk -F " " "{
+    for (i = 1; i <= NF; i++)
+        if (\$i == \"-b\")
         {
-            printf $(i+1) " " $(i+2)
+            printf \$(i+1) \" \" \$(i+2)
         }
-    }')
+    }")
 
-CURRENCY=$(echo "$FILTER" | awk -F ' ' '{
-    for (i=1; i<=NF; i++)
-        if ($i == "-c")
+CURRENCY=$(echo "$FILTER" | awk -F " " "{
+    for (i = 1; i <= NF; i++)
+        if (\$i == \"-c\")
         {
-            currencies = (currencies == "") ? $(i+1) : currencies " " $(i+1)
+            currencies = (currencies == \"\") ? \$(i+1) : currencies \" \" \$(i+1)
         }
     }
     END {
         print currencies
-    }')
+    }")
 
+# filter input to only include the lines with the specified user
+# then filter based on the input filters
 LIST=$(echo "$LOG_INPUT" | awk -F ";" -v user="$USER" "{
     if (\$1 == user)
     {
@@ -130,54 +140,60 @@ LIST=$(echo "$LOG_INPUT" | awk -F ";" -v user="$USER" "{
 }")
 
 if [ -n "$AFTER_TIME" ]; then
-    LIST=$(echo "$LIST" | awk -F ";" -v after_time="$AFTER_TIME" '{
-        if ($2 > after_time)
+    LIST=$(echo "$LIST" | awk -F ";" -v after_time="$AFTER_TIME" "{
+        if (\$2 > after_time)
         {
-            printf "%s\n", $0
+            printf \"%s\n\", \$0
         }
-    }')
+    }")
 fi
 
 if [ -n "$BEFORE_TIME" ]; then
-    LIST=$(echo "$LIST" | awk -F ";" -v before_time="$BEFORE_TIME" '{
-        if ($2 < before_time)
+    LIST=$(echo "$LIST" | awk -F ";" -v before_time="$BEFORE_TIME" "{
+        if (\$2 < before_time)
         {
-            printf "%s\n", $0
+            printf \"%s\n\", \$0
         }
-    }')
+    }")
 fi
 
 if [ -n "$CURRENCY" ]; then
-    LIST=$(echo "$LIST" | awk -F ";" -v currency="$CURRENCY" 'BEGIN {
-        split(currency, currencies, " ")
+    LIST=$(echo "$LIST" | awk -F ";" -v currency="$CURRENCY" "BEGIN {
+        split(currency, currencies, \" \")
     }
     {
         for (i in currencies)
         {
-            if ($3 == currencies[i])
+            if (\$3 == currencies[i])
             {
-                printf "%s\n", $0; break
+                printf \"%s\n\", \$0; break
             }
         }
-    }')
+    }")
 fi
 
-# if list is empty dont go through cases or it'll break
+# if list is empty dont go through commands or it'll break
 if [ -z "$LIST" ]; then
     echo ""
     exit 0
 fi
 
+# show output based on command
 case "$COMMAND" in
 list | "")
     echo "$LIST"
     ;;
 list-currency)
-    echo "$LIST" | awk -F ";" "{print \$3}" | sort | uniq
+    echo "$LIST" | awk -F ";" "{
+        print \$3
+    }" | sort | uniq
     ;;
 status)
     echo "$LIST" | awk -F ";" "{
-        currencies[\$3] += \$4
+        currency = \$3
+        currency_value = \$4
+
+        currencies[currency] += currency_value
         }
         END {
             for (currency in currencies)
@@ -188,7 +204,18 @@ status)
     ;;
 profit)
     echo "$LIST" | awk -F ";" -v xtf_profit="${XTF_PROFIT:-20}" "{
-        currencies[\$3] += (\$4 > 0) ? (\$4 + (\$4 * xtf_profit / 100)) : \$4
+        currency = \$3
+        currency_value = \$4
+
+        if (currency_value > 0)
+        {
+            currencies[currency] += currency_value + (currency_value * xtf_profit / 100)
+        }
+        else
+        {
+            currencies[currency] += currency_value
+        }
+
         }
         END {
             for (currency in currencies)
