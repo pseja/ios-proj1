@@ -117,3 +117,20 @@ CURRENCY=$(echo "$FILTER" | awk -F ' ' '{
 echo "AFTER_TIME: $AFTER_TIME;"
 echo "BEFORE_TIME: $BEFORE_TIME;"
 echo "CURRENCY: $CURRENCY;"
+
+LIST=$(echo "$LOG_INPUT" | awk -F ";" "{if (\$1 == \"$USER\") {printf \"%s\n\", \$0}}")
+
+if [ -n "$AFTER_TIME" ]; then
+    echo "after time neni prazdny"
+    LIST=$(echo "$LIST" | awk -F ";" -v after_time="$AFTER_TIME" '{if ($2 > after_time) {printf "%s\n", $0}}')
+fi
+
+if [ -n "$BEFORE_TIME" ]; then
+    echo "before time neni prazdny"
+    LIST=$(echo "$LIST" | awk -F ";" -v before_time="$BEFORE_TIME" '{if ($1 == user && $2 < before_time) {printf "%s\n", $0}}')
+fi
+
+if [ -n "$CURRENCY" ]; then
+    echo "currency neni prazdny"
+    LIST=$(echo "$LIST" | awk -F ";" -v currency="$CURRENCY" 'BEGIN {split(currency, currencies, " ")} {for (i in currencies) {if ($3 == currencies[i]) {printf "%s\n", $0; break}}}')
+fi
