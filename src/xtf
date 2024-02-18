@@ -17,6 +17,13 @@ print_help() {
     echo "    profit"
 }
 
+# getopts nepouzivat protoze kdyz neuvidi prvni validni argument tak se ukonci
+#        ale vstupy muzou byt v libovolnym poradi
+
+#READ_INPUT_LOGS="gzip -d -c $GZIP | cat $LOGS - | sort"
+
+#READ_FILTERED="eval $READ_INPUT_LOGS | awk -F ';' '(\$1 > $AFTER_TIME &&) {print \$0}' | grep "
+
 FILTER=""
 COMMAND=""
 USER=""
@@ -25,14 +32,13 @@ ZIPPED_LOGS=""
 
 while [ "$#" -gt 0 ]; do
     case "$1" in
-
     -h | --help)
         print_help
         exit 0
         ;;
 
     -a | -b | -c)
-        FILTER="$1 $2"
+        FILTER="$1 $2 $FILTER"
         shift 2
         ;;
 
@@ -67,3 +73,16 @@ echo "command = $COMMAND"
 echo "user = $USER"
 echo "logs = $LOGS"
 echo "zips = $ZIPPED_LOGS"
+echo "-------------------"
+
+for log in $LOGS; do
+    if [ -f "$log" ]; then
+        LOG_INPUT="${LOG_INPUT}$(cat "$log")"
+    fi
+done
+
+for gz_log in $ZIPPED_LOGS; do
+    if [ -f "$gz_log" ]; then
+        LOG_INPUT="${LOG_INPUT}\n$(gzip -d -c "$gz_log")"
+    fi
+done
