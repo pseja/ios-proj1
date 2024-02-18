@@ -17,11 +17,22 @@ print_help() {
     echo "    profit"
 }
 
+check_datetime_format() {
+    if expr "$1" : "^[0-9]\{4\}-[0-9]\{2\}-[0-9]\{2\} [0-9]\{2\}:[0-9]\{2\}:[0-9]\{2\}$" >/dev/null; then
+        return 0
+    else
+        echo "Invalid DATETIME format." >&2
+        exit 1
+    fi
+}
+
 FILTER=""
 COMMAND=""
 USER=""
 LOGS=""
 ZIPPED_LOGS=""
+
+COMMAND_COUNTER=0
 
 while [ "$#" -gt 0 ]; do
     case "$1" in
@@ -31,11 +42,22 @@ while [ "$#" -gt 0 ]; do
         ;;
 
     -a | -b | -c)
+        if [ "$1" != "-c" ]; then
+            check_datetime_format "$2"
+        fi
+
         FILTER="$1 $2 $FILTER"
         shift 2
         ;;
 
     list | list-currency | status | profit)
+        COMMAND_COUNTER=$((COMMAND_COUNTER + 1))
+
+        if [ "$COMMAND_COUNTER" -gt 1 ]; then
+            echo "Invalid amount of commands." >&2
+            exit 2
+        fi
+
         COMMAND="$1"
         shift
         ;;
@@ -60,13 +82,6 @@ while [ "$#" -gt 0 ]; do
         ;;
     esac
 done
-
-echo "filter = $FILTER"
-echo "command = $COMMAND"
-echo "user = $USER"
-echo "logs = $LOGS"
-echo "zips = $ZIPPED_LOGS"
-echo "-------------------"
 
 for log in $LOGS; do
     if [ -f "$log" ]; then
@@ -107,11 +122,12 @@ CURRENCY=$(echo "$FILTER" | awk -F ' ' '{
         print currencies
     }')
 
-echo "AFTER_TIME: $AFTER_TIME;"
-echo "BEFORE_TIME: $BEFORE_TIME;"
-echo "CURRENCY: $CURRENCY;"
-
-LIST=$(echo "$LOG_INPUT" | awk -F ";" "{if (\$1 == \"$USER\") {printf \"%s\n\", \$0}}")
+LIST=$(echo "$LOG_INPUT" | awk -F ";" -v user="$USER" "{
+    if (\$1 == user)
+    {
+        printf \"%s\n\", \$0
+    }
+}")
 
 if [ -n "$AFTER_TIME" ]; then
     LIST=$(echo "$LIST" | awk -F ";" -v after_time="$AFTER_TIME" '{
@@ -124,7 +140,7 @@ fi
 
 if [ -n "$BEFORE_TIME" ]; then
     LIST=$(echo "$LIST" | awk -F ";" -v before_time="$BEFORE_TIME" '{
-        if ($1 == user && $2 < before_time)
+        if ($2 < before_time)
         {
             printf "%s\n", $0
         }
@@ -146,16 +162,20 @@ if [ -n "$CURRENCY" ]; then
     }')
 fi
 
-XTF_PROFIT=20
+# if list is empty dont go through cases or it'll break
+if [ -z "$LIST" ]; then
+    echo ""
+    exit 0
+fi
 
 case "$COMMAND" in
-"list" | "")
+list | "")
     echo "$LIST"
     ;;
-"list-currency")
+list-currency)
     echo "$LIST" | awk -F ";" "{print \$3}" | sort | uniq
     ;;
-"status")
+status)
     echo "$LIST" | awk -F ";" "{
         currencies[\$3] += \$4
         }
@@ -166,8 +186,8 @@ case "$COMMAND" in
             }
     }"
     ;;
-"profit")
-    echo "$LIST" | awk -F ";" -v xtf_profit="$XTF_PROFIT" "{
+profit)
+    echo "$LIST" | awk -F ";" -v xtf_profit="${XTF_PROFIT:-20}" "{
         currencies[\$3] += (\$4 > 0) ? (\$4 + (\$4 * xtf_profit / 100)) : \$4
         }
         END {
@@ -178,3 +198,5 @@ case "$COMMAND" in
     }"
     ;;
 esac
+
+exit 0
