@@ -18,7 +18,7 @@ print_help() {
 }
 
 check_datetime_format() {
-    if expr "$1" : "^[0-9]\{4\}-[0-9]\{2\}-[0-9]\{2\} [0-9]\{2\}:[0-9]\{2\}:[0-9]\{2\}$" >/dev/null; then
+    if date -d "$1" "+%Y-%m-%d %H:%M:%S" >/dev/null; then
         return 0
     else
         echo "Invalid DATETIME format." >&2
@@ -29,8 +29,6 @@ check_datetime_format() {
 FILTER=""
 COMMAND=""
 USER=""
-LOGS=""
-ZIPPED_LOGS=""
 
 COMMAND_COUNTER=0
 
@@ -67,10 +65,10 @@ while [ "$#" -gt 0 ]; do
         while [ "$#" -gt 0 ]; do
             case "$1" in
             *.gz)
-                ZIPPED_LOGS="$1 $ZIPPED_LOGS"
+                LOG_INPUT="${LOG_INPUT}\n$(gzip -d -c "$1")"
                 ;;
             *)
-                LOGS="$1 $LOGS"
+                LOG_INPUT="${LOG_INPUT}$(cat "$1")"
                 ;;
             esac
             shift
@@ -88,19 +86,6 @@ if [ -z "$USER" ]; then
     echo "No user specified." >&2
     exit 3
 fi
-
-# put all logs into a single LOG_INPUT variable
-for log in $LOGS; do
-    if [ -f "$log" ]; then
-        LOG_INPUT="${LOG_INPUT}$(cat "$log")"
-    fi
-done
-
-for gz_log in $ZIPPED_LOGS; do
-    if [ -f "$gz_log" ]; then
-        LOG_INPUT="${LOG_INPUT}\n$(gzip -d -c "$gz_log")"
-    fi
-done
 
 # separate filters into their respective variables
 AFTER_TIME=$(echo "$FILTER" | awk -F " " "{
