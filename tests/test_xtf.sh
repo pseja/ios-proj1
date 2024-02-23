@@ -4,7 +4,7 @@
 # author: dzives
 # heavily inspired by: pseja
 # Usage:
-#     (1) Download the gist to your "xtf" directory: wget https://gist.githubusercontent.com/dzives/bcb93e43e6643f86e8225d35f6817391/raw/cd533af71bbe4f0fc8ea6aa2ea8f5eece1303bbf/test_xtf.sh
+#     (1) Download the gist to your "xtf" directory: wget https://gist.githubusercontent.com/dzives/bcb93e43e6643f86e8225d35f6817391/raw/7777b8ec875254780af45b669c4af528d775e0b1/test_xtf.sh
 #     (2) Then (for adding permission):                 chmod u+x test_xtf.sh
 #     (3) Execute this command in "xtf" directory:   ./test_xtf.sh
 #     (4) If any test fails, it will output the difference between the expected result and your output with diff command into the diff folder
@@ -19,26 +19,35 @@ NORMAL='\033[0m'
 test_count=0
 correct=0
 
+# compile maze.c just in case
+
 rm -rf diff
 
 run_test() {
     local expected_output=${1}
     local args=("${@:2}")
-    echo -n -e "$test_count. Running ./xtf ${args[@]}"
+    echo -n -e "$test_count. Running ./xtf"
+    for arg in "${args[@]}"; do
+        echo -n " \"$arg\""
+    done
+    echo ""
 
-    local actual_output=$(../src/xtf "${args[@]}")
+    local actual_output=$(./xtf "${args[@]}")
 
     if [[ "$actual_output" == "$expected_output" ]]; then
         echo -e "${GREEN} [OK] ${NORMAL}"
         correct=$((correct + 1))
+        test_count=$((test_count + 1))
+        return 0
     else
         echo -e "${RED}[FAIL]${NORMAL}"
         mkdir -p diff
         echo -e "$expected_output" >"./diff/$test_count:diff_expected.txt"
         echo -e "$actual_output" >"./diff/$test_count:diff_yours.txt"
         diff "./diff/$test_count:diff_expected.txt" "./diff/$test_count:diff_yours.txt"
+        test_count=$((test_count + 1))
+        return 1
     fi
-    test_count=$((test_count + 1))
 
 }
 
@@ -96,6 +105,13 @@ args=("profit" "Trader1" "cryptoexchange.log")
 run_test "ETH : 15.4745
 EUR : -2000.0000
 USD : -3000.0000" "${args[@]}"
+if [ "$?" = "1" ]; then
+    test_count=$((test_count - 1))
+    echo Rerunning test "$test_count"
+    run_test "ETH : 15.4744
+EUR : -2000.0000
+USD : -3000.0000" "${args[@]}"
+fi
 
 # 9
 export XTF_PROFIT=40
@@ -103,6 +119,13 @@ args=("profit" "Trader1" "cryptoexchange.log")
 run_test "ETH : 18.0536
 EUR : -2000.0000
 USD : -3000.0000" "${args[@]}"
+if [ "$?" = "1" ]; then
+    test_count=$((test_count - 1))
+    echo Rerunning test "$test_count"
+    run_test "ETH : 18.0535
+EUR : -2000.0000
+USD : -3000.0000" "${args[@]}"
+fi
 unset XTF_PROFIT
 
 # 10
@@ -146,7 +169,7 @@ Trader1;2024-01-16 18:06:32;USD;-3000.0000
 Trader1;2024-01-20 11:43:02;ETH;1.9417
 Trader1;2024-01-22 09:17:40;ETH;10.9537" "${args[@]}"
 
-# 15 2 usernames
+# 15 invalid file with space or 2 usernames
 args=("list-currency" "Trader1" "Trader 2" "cryptoexchange.log")
 run_test "" "${args[@]}"
 
@@ -154,7 +177,7 @@ run_test "" "${args[@]}"
 args=("status" "Trader1" "invalid.log")
 run_test "" "${args[@]}"
 
-# 17 no user
+# 17 no user/
 args=("status" "cryptoexchange.log")
 run_test "" "${args[@]}"
 
@@ -167,24 +190,44 @@ args=("status" "list" "Trader1" "cryptoexchange.log")
 run_test "" "${args[@]}"
 
 # 20 duplicate files
-# args=("list" "Trader1" "cryptoexchange.log" "cryptoexchange.log")
-# run_test "Trader1;2024-01-15 15:30:42;EUR;-2000.0000
-# Trader1;2024-01-16 18:06:32;USD;-3000.0000
-# Trader1;2024-01-20 11:43:02;ETH;1.9417
-# Trader1;2024-01-22 09:17:40;ETH;10.9537" "${args[@]}"
-
+# WARNING UNDEFINED BEHAVIOR (logs in files should be in chronological order, the tests shouldn't have this)
 args=("list" "Trader1" "cryptoexchange.log" "cryptoexchange.log")
-run_test "" "${args[@]}"
+run_test "Trader1;2024-01-15 15:30:42;EUR;-2000.0000
+Trader1;2024-01-16 18:06:32;USD;-3000.0000
+Trader1;2024-01-20 11:43:02;ETH;1.9417
+Trader1;2024-01-22 09:17:40;ETH;10.9537
+Trader1;2024-01-15 15:30:42;EUR;-2000.0000
+Trader1;2024-01-16 18:06:32;USD;-3000.0000
+Trader1;2024-01-20 11:43:02;ETH;1.9417
+Trader1;2024-01-22 09:17:40;ETH;10.9537" "${args[@]}"
+if [ "$?" = "1" ]; then
+    echo -e "${RED}WARNING UNDEFINED BEHAVIOR${NORMAL}"
+fi
+
+# args=("list" "Trader1" "cryptoexchange.log" "cryptoexchange.log")
+# run_test "" "${args[@]}"
 
 # 21 duplicate files
-# args=("list" "Trader1" "cryptoexchange.log" "cryptoexchange.log" "cryptoexchange.log")
-# run_test "Trader1;2024-01-15 15:30:42;EUR;-2000.0000
-# Trader1;2024-01-16 18:06:32;USD;-3000.0000
-# Trader1;2024-01-20 11:43:02;ETH;1.9417
-# Trader1;2024-01-22 09:17:40;ETH;10.9537" "${args[@]}"
-
+# WARNING UNDEFINED BEHAVIOR (logs in files should be in chronological order, the tests shouldn't have this)
 args=("list" "Trader1" "cryptoexchange.log" "cryptoexchange.log" "cryptoexchange.log")
-run_test "" "${args[@]}"
+run_test "Trader1;2024-01-15 15:30:42;EUR;-2000.0000
+Trader1;2024-01-16 18:06:32;USD;-3000.0000
+Trader1;2024-01-20 11:43:02;ETH;1.9417
+Trader1;2024-01-22 09:17:40;ETH;10.9537
+Trader1;2024-01-15 15:30:42;EUR;-2000.0000
+Trader1;2024-01-16 18:06:32;USD;-3000.0000
+Trader1;2024-01-20 11:43:02;ETH;1.9417
+Trader1;2024-01-22 09:17:40;ETH;10.9537
+Trader1;2024-01-15 15:30:42;EUR;-2000.0000
+Trader1;2024-01-16 18:06:32;USD;-3000.0000
+Trader1;2024-01-20 11:43:02;ETH;1.9417
+Trader1;2024-01-22 09:17:40;ETH;10.9537" "${args[@]}"
+if [ "$?" = "1" ]; then
+    echo -e "${RED}WARNING UNDEFINED BEHAVIOR${NORMAL}"
+fi
+
+# args=("list" "Trader1" "cryptoexchange.log" "cryptoexchange.log" "cryptoexchange.log")
+# run_test "" "${args[@]}"
 
 # 22
 args=("cryptoexchange.log")
@@ -222,6 +265,58 @@ args=("-a" "2024-01-21 15:29:29" "profit" "Trader1" "cryptoexchange.log")
 run_test "ETH : 10.9537" "${args[@]}"
 unset XTF_PROFIT
 
+# more tests by @dzives
+
+# 30 mutliple files profit
+args=("profit" "Trader1" "cryptoexchange.log" "cryptoexchange-2.log.gz")
+run_test "ETH : 30.9490
+EUR : -2000.0000
+USD : -3000.0000" "${args[@]}"
+if [ "$?" = "1" ]; then
+    test_count=$((test_count - 1))
+    echo Rerunning test "$test_count"
+    run_test "ETH : 30.9489
+EUR : -2000.0000
+USD : -3000.0000" "${args[@]}"
+fi
+
+# 31 profit >= 100
+export XTF_PROFIT=120
+args=("profit" "Trader1" "cryptoexchange.log")
+run_test "ETH : 28.3699
+EUR : -2000.0000
+USD : -3000.0000" "${args[@]}"
+unset XTF_PROFIT
+if [ "$?" = "1" ]; then
+    test_count=$((test_count - 1))
+    echo Rerunning test "$test_count"
+    run_test "ETH : 28.3698
+EUR : -2000.0000
+USD : -3000.0000" "${args[@]}"
+fi
+
+# 32 space in name
+cp cryptoexchange.log "crypto exchange.log"
+args=("list-currency" "Trader1" "crypto exchange.log")
+run_test "ETH
+EUR
+USD" "${args[@]}"
+
+# 33 space in name of gzip
+gzip -c cryptoexchange.log >"crypto exchange.log.gz"
+args=("list-currency" "Trader1" "crypto exchange.log.gz")
+run_test "ETH
+EUR
+USD" "${args[@]}"
+
+# 34 long currency (4 chars)
+args=("list" "-c" "ABCD" "Trader1" "cryptoexchange.log")
+run_test "" "${args[@]}"
+
+# 35 short currency (2 chars)
+args=("list" "-c" "AB" "Trader1" "cryptoexchange.log")
+run_test "" "${args[@]}"
+
 # print test results
 if [[ "$correct" == "$test_count" ]]; then
     echo -e "\nPassed $correct / $test_count 🎉"
@@ -236,3 +331,4 @@ fi
 rm cryptoexchange.log
 rm cryptoexchange-2.log.gz
 rm cryptoexchange-1.log
+rm "crypto exchange.log"
