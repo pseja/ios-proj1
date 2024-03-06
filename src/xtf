@@ -27,11 +27,12 @@ check_datetime_format() {
 }
 
 parse_arguments() {
-    FILTER=""
     COMMAND=""
     USER=""
 
     COMMAND_COUNTER=0
+    FLAG_A_USED=0
+    FLAG_B_USED=0
 
     # parsing arguments
     while [ "$#" -gt 0 ]; do
@@ -41,12 +42,30 @@ parse_arguments() {
             exit 0
             ;;
 
-        -a | -b | -c)
-            if [ "$1" != "-c" ]; then
-                check_datetime_format "$2"
+        -a)
+            if [ "$FLAG_A_USED" -eq 1 ]; then
+                echo "Invalid amount of -a flags." >&2
+                exit 2
             fi
+            check_datetime_format "$2"
+            AFTER_TIME="$2"
+            FLAG_A_USED=1
+            shift 2
+            ;;
 
-            FILTER="$1 $2 $FILTER"
+        -b)
+            if [ "$FLAG_B_USED" -eq 1 ]; then
+                echo "Invalid amount of -b flags." >&2
+                exit 2
+            fi
+            check_datetime_format "$2"
+            BEFORE_TIME="$2"
+            FLAG_B_USED=1
+            shift 2
+            ;;
+
+        -c)
+            CURRENCY="$2 $CURRENCY"
             shift 2
             ;;
 
@@ -85,35 +104,6 @@ parse_arguments() {
         echo "No user specified." >&2
         exit 3
     fi
-}
-
-separate_filters() {
-    AFTER_TIME=$(echo "$FILTER" | awk -F " " "{
-        for (i = 1; i <= NF; i++)
-            if (\$i == \"-a\")
-            {
-                printf \$(i+1) \" \" \$(i+2)
-            }
-        }")
-
-    BEFORE_TIME=$(echo "$FILTER" | awk -F " " "{
-        for (i = 1; i <= NF; i++)
-            if (\$i == \"-b\")
-            {
-                printf \$(i+1) \" \" \$(i+2)
-            }
-        }")
-
-    CURRENCY=$(echo "$FILTER" | awk -F " " "{
-        for (i = 1; i <= NF; i++)
-            if (\$i == \"-c\")
-            {
-                currencies = (currencies == \"\") ? \$(i+1) : currencies \" \" \$(i+1)
-            }
-        }
-        END {
-            print currencies
-        }")
 }
 
 filter_input() {
@@ -220,7 +210,6 @@ show_output() {
 
 main() {
     parse_arguments "$@"
-    separate_filters
     filter_input
     show_output
     exit 0
