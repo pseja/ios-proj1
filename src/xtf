@@ -26,155 +26,160 @@ check_datetime_format() {
     fi
 }
 
-FILTER=""
-COMMAND=""
-USER=""
+parse_arguments() {
+    FILTER=""
+    COMMAND=""
+    USER=""
 
-COMMAND_COUNTER=0
+    COMMAND_COUNTER=0
 
-# parsing arguments
-while [ "$#" -gt 0 ]; do
-    case "$1" in
-    -h | --help)
-        print_help
-        exit 0
-        ;;
+    # parsing arguments
+    while [ "$#" -gt 0 ]; do
+        case "$1" in
+        -h | --help)
+            print_help
+            exit 0
+            ;;
 
-    -a | -b | -c)
-        if [ "$1" != "-c" ]; then
-            check_datetime_format "$2"
-        fi
-
-        FILTER="$1 $2 $FILTER"
-        shift 2
-        ;;
-
-    list | list-currency | status | profit)
-        COMMAND_COUNTER=$((COMMAND_COUNTER + 1))
-
-        if [ "$COMMAND_COUNTER" -gt 1 ]; then
-            echo "Invalid amount of commands." >&2
-            exit 2
-        fi
-
-        COMMAND="$1"
-        shift
-        ;;
-
-    *.gz)
-        LOG_INPUT="${LOG_INPUT}\n$(gzip -d -c "$1")"
-        shift
-        ;;
-
-    *)
-        if [ -z "$USER" ]; then
-            USER="$1"
-        else
-            if ! LOG_INPUT="${LOG_INPUT}\n$(cat "$1")"; then
-                echo "" && echo "Error reading file $1" >&2
-                exit 4
+        -a | -b | -c)
+            if [ "$1" != "-c" ]; then
+                check_datetime_format "$2"
             fi
-        fi
-        shift
-        ;;
-    esac
-done
 
-if [ -z "$USER" ]; then
-    echo "No user specified." >&2
-    exit 3
-fi
+            FILTER="$1 $2 $FILTER"
+            shift 2
+            ;;
 
-# separate filters into their respective variables
-AFTER_TIME=$(echo "$FILTER" | awk -F " " "{
-    for (i = 1; i <= NF; i++)
-        if (\$i == \"-a\")
-        {
-            printf \$(i+1) \" \" \$(i+2)
-        }
-    }")
+        list | list-currency | status | profit)
+            COMMAND_COUNTER=$((COMMAND_COUNTER + 1))
 
-BEFORE_TIME=$(echo "$FILTER" | awk -F " " "{
-    for (i = 1; i <= NF; i++)
-        if (\$i == \"-b\")
-        {
-            printf \$(i+1) \" \" \$(i+2)
-        }
-    }")
+            if [ "$COMMAND_COUNTER" -gt 1 ]; then
+                echo "Invalid amount of commands." >&2
+                exit 2
+            fi
 
-CURRENCY=$(echo "$FILTER" | awk -F " " "{
-    for (i = 1; i <= NF; i++)
-        if (\$i == \"-c\")
-        {
-            currencies = (currencies == \"\") ? \$(i+1) : currencies \" \" \$(i+1)
-        }
-    }
-    END {
-        print currencies
-    }")
+            COMMAND="$1"
+            shift
+            ;;
 
-# filter input to only include the lines with the specified user
-# then filter based on the input filters
-LIST=$(echo "$LOG_INPUT" | awk -F ";" -v user="$USER" "{
-    if (\$1 == user)
-    {
-        printf \"%s\n\", \$0
-    }
-}")
+        *.gz)
+            LOG_INPUT="${LOG_INPUT}\n$(gzip -d -c "$1")"
+            shift
+            ;;
 
-if [ -n "$AFTER_TIME" ]; then
-    LIST=$(echo "$LIST" | awk -F ";" -v after_time="$AFTER_TIME" "{
-        if (\$2 > after_time)
-        {
-            printf \"%s\n\", \$0
-        }
-    }")
-fi
+        *)
+            if [ -z "$USER" ]; then
+                USER="$1"
+            else
+                if ! LOG_INPUT="${LOG_INPUT}\n$(cat "$1")"; then
+                    echo "" && echo "Error reading file $1" >&2
+                    exit 4
+                fi
+            fi
+            shift
+            ;;
+        esac
+    done
 
-if [ -n "$BEFORE_TIME" ]; then
-    LIST=$(echo "$LIST" | awk -F ";" -v before_time="$BEFORE_TIME" "{
-        if (\$2 < before_time)
-        {
-            printf \"%s\n\", \$0
-        }
-    }")
-fi
+    if [ -z "$USER" ]; then
+        echo "No user specified." >&2
+        exit 3
+    fi
+}
 
-if [ -n "$CURRENCY" ]; then
-    LIST=$(echo "$LIST" | awk -F ";" -v currency="$CURRENCY" "BEGIN {
-        split(currency, currencies, \" \")
-    }
-    {
-        for (i in currencies)
-        {
-            if (\$3 == currencies[i])
+separate_filters() {
+    AFTER_TIME=$(echo "$FILTER" | awk -F " " "{
+        for (i = 1; i <= NF; i++)
+            if (\$i == \"-a\")
             {
-                printf \"%s\n\", \$0; break
+                printf \$(i+1) \" \" \$(i+2)
+            }
+        }")
+
+    BEFORE_TIME=$(echo "$FILTER" | awk -F " " "{
+        for (i = 1; i <= NF; i++)
+            if (\$i == \"-b\")
+            {
+                printf \$(i+1) \" \" \$(i+2)
+            }
+        }")
+
+    CURRENCY=$(echo "$FILTER" | awk -F " " "{
+        for (i = 1; i <= NF; i++)
+            if (\$i == \"-c\")
+            {
+                currencies = (currencies == \"\") ? \$(i+1) : currencies \" \" \$(i+1)
             }
         }
+        END {
+            print currencies
+        }")
+}
+
+filter_input() {
+    # filter input to only include the lines with the specified user
+    # then filter based on the input filters
+    LIST=$(echo "$LOG_INPUT" | awk -F ";" -v user="$USER" "{
+        if (\$1 == user)
+        {
+            printf \"%s\n\", \$0
+        }
     }")
-fi
 
-# if list is empty dont go through commands or it'll break
-if [ -z "$LIST" ]; then
-    echo ""
-    exit 0
-fi
+    if [ -n "$AFTER_TIME" ]; then
+        LIST=$(echo "$LIST" | awk -F ";" -v after_time="$AFTER_TIME" "{
+            if (\$2 > after_time)
+            {
+                printf \"%s\n\", \$0
+            }
+        }")
+    fi
 
-# show output based on command
-case "$COMMAND" in
-list | "")
-    echo "$LIST"
-    ;;
+    if [ -n "$BEFORE_TIME" ]; then
+        LIST=$(echo "$LIST" | awk -F ";" -v before_time="$BEFORE_TIME" "{
+            if (\$2 < before_time)
+            {
+                printf \"%s\n\", \$0
+            }
+        }")
+    fi
 
-list-currency)
-    echo "$LIST" | awk -F ";" "{
+    if [ -n "$CURRENCY" ]; then
+        LIST=$(echo "$LIST" | awk -F ";" -v currency="$CURRENCY" "BEGIN {
+            split(currency, currencies, \" \")
+        }
+        {
+            for (i in currencies)
+            {
+                if (\$3 == currencies[i])
+                {
+                    printf \"%s\n\", \$0; break
+                }
+            }
+        }")
+    fi
+
+    # if list is empty dont go through commands or it'll break
+    if [ -z "$LIST" ]; then
+        echo ""
+        exit 0
+    fi
+}
+
+show_output() {
+    case "$COMMAND" in
+    list | "")
+        echo "$LIST"
+        ;;
+
+    list-currency)
+        echo "$LIST" | awk -F ";" "{
         print \$3
     }" | sort | uniq
-    ;;
+        ;;
 
-status)
-    echo "$LIST" | awk -F ";" "{
+    status)
+        echo "$LIST" | awk -F ";" "{
         currency = \$3
         currency_value = \$4
 
@@ -186,10 +191,10 @@ status)
                 printf \"%s : %.4f\n\", currency, currencies[currency] | \"sort\"
             }
     }"
-    ;;
+        ;;
 
-profit)
-    echo "$LIST" | awk -F ";" -v xtf_profit="${XTF_PROFIT:-20}" "{
+    profit)
+        echo "$LIST" | awk -F ";" -v xtf_profit="${XTF_PROFIT:-20}" "{
         currency = \$3
         currency_value = \$4
 
@@ -209,7 +214,16 @@ profit)
                 printf \"%s : %.4f\n\", currency, currencies[currency] | \"sort\"
             }
     }"
-    ;;
-esac
+        ;;
+    esac
+}
 
-exit 0
+main() {
+    parse_arguments "$@"
+    separate_filters
+    filter_input
+    show_output
+    exit 0
+}
+
+main "$@"
