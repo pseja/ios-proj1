@@ -188,46 +188,29 @@ filter_input() {
     # }")
 
     LIST=$(
-        echo "$LOG_INPUT" | awk -F ";" -v user="$USER" "{
-        if (\$1 == user)
+        echo "$LOG_INPUT" | awk -F ";" -v user="$USER" -v after_time="$AFTER_TIME" -v before_time="$BEFORE_TIME" -v currency="$CURRENCY" "BEGIN {
+        split(currency, currencies, \" \")
+    }
+    {
+        if (\$1 == user && (after_time == \"\" || \$2 > after_time) && (before_time == \"\" || \$2 < before_time))
         {
-            printf \"%s\n\", \$0
+            if (currency == \"\")
+            {
+                printf \"%s\n\", \$0
+            }
+            else
+            {
+                for (i in currencies)
+                {
+                    if (\$3 == currencies[i])
+                    {
+                        printf \"%s\n\", \$0
+                    }
+                }
+            }
         }
     }"
     )
-
-    if [ -n "$AFTER_TIME" ]; then
-        LIST=$(echo "$LIST" | awk -F ";" -v after_time="$AFTER_TIME" "{
-            if (\$2 > after_time)
-            {
-                printf \"%s\n\", \$0
-            }
-        }")
-    fi
-
-    if [ -n "$BEFORE_TIME" ]; then
-        LIST=$(echo "$LIST" | awk -F ";" -v before_time="$BEFORE_TIME" "{
-            if (\$2 < before_time)
-            {
-                printf \"%s\n\", \$0
-            }
-        }")
-    fi
-
-    if [ -n "$CURRENCY" ]; then
-        LIST=$(echo "$LIST" | awk -F ";" -v currency="$CURRENCY" "BEGIN {
-            split(currency, currencies, \" \")
-        }
-        {
-            for (i in currencies)
-            {
-                if (\$3 == currencies[i])
-                {
-                    printf \"%s\n\", \$0; break
-                }
-            }
-        }")
-    fi
 
     # if list is empty dont go through commands or it'll break
     if [ -z "$LIST" ]; then
