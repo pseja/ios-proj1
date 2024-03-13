@@ -2,7 +2,6 @@
 
 export POSIXLY_CORRECT=yes
 export LC_ALL="C"
-set -e
 
 print_help() {
     echo "Usage: xtf [-h|--help] [FILTER] [COMMAND] USER LOG [LOG2 [...]"
@@ -114,84 +113,50 @@ parse_arguments() {
 
 }
 
-check_logs_format() {
-    if ! printf "%s\n" "$LOG_INPUT" | while IFS=';' read -r user datetime currency value; do
-        if [ -z "$user" ]; then
-            echo "No user specified in logs." >&2
-            exit 1
-        fi
-
-        if [ -z "$datetime" ]; then
-            echo "No datetime specified in logs." >&2
-            exit 2
-        else
-            check_datetime_format "$datetime"
-        fi
-
-        if ! echo "$currency" | grep -qE "^[A-Z]{3}$"; then
-            echo "Invalid currency format in logs." >&2
-            exit 3
-        fi
-
-        if ! echo "$value" | grep -Eq "^(-?[0-9]+(\.[0-9]+))$"; then
-            echo "Invalid price format in logs." >&2
-            exit 4
-        fi
-
-    done; then
-        exit 5
-    fi
-}
-
-filter_input() {
-    # LIST=$(echo "$LOG_INPUT" | awk -F ";" -v inputuser="$USER" "{
-    #     error = 0
-    #     user = \$1
-    #     datetime = \$2
-    #     currency = \$3
-    #     price = \$4
-
-    #     if (length(user) == 0)
-    #     {
-    #         error = 1
-    #         exit error
-    #     }
-
-    #     if (length(datetime) == 0 || datetime !~ /^[0-9]{4}-[0-1][0-9]-[0-3][0-9] [0-2][0-9]:[0-5][0-9]:[0-5][0-9]$/)
-    #     {
-    #         error = 2
-    #         exit error
-    #     }
-
-    #     if (length(currency) == 0 || currency !~ /^[A-Z]{3}$/)
-    #     {
-    #         error = 3
-    #         exit error
-    #     }
-
-    #     if (length(price) == 0 || price !~ /^([+-]?[0-9]+(\.[0-9]+))$/)
-    #     {
-    #         error = 4
-    #         exit error
-    #     }
-
-    #     if (\$1 == inputuser)
-    #     {
-    #         printf \"%s\n\", \$0
-    #     }
-    # } END {
-    #     # TODO FIGURE THIS SHIT OUT
-    #     if (error != 0)
-    #     {
-    #         print error > \"/dev/stderr\"
-    #     }
-    # }")
-
+check_format_and_filter_input() {
     LIST=$(
         echo "$LOG_INPUT" | awk -F ";" -v user="$USER" -v after_time="$AFTER_TIME" -v before_time="$BEFORE_TIME" -v currency="$CURRENCY" "BEGIN {
         split(currency, currencies, \" \")
     }
     {
+        # skip first line which is somehow always empty to avoid false positives
+        if (NR < 2)
+        {
+            next
+        }
+
+        _user = \$1
+        _datetime = \$2
+        _currency = \$3
+        _price = \$4
+
+        # DEBUG PRINT
+        # printf \"User: '%s', Datetime: '%s', Currency: '%s', Price: '%s'\n\", _user, _datetime, _currency, _price > \"/dev/stderr\";
+
+        if (!length(_user))
+        {
+            printf \"User is missing in logs.\n\" > \"/dev/stderr\"
+            exit 1
+        }
+
+        if (!length(_datetime) || _datetime !~ /^[0-9]{4}-[0-1][0-9]-[0-3][0-9] [0-2][0-9]:[0-5][0-9]:[0-5][0-9]$/)
+        {
+            printf \"Datetime is missing or in incorrect format in logs.\n\" > \"/dev/stderr\"
+            exit 1
+        }
+
+        if (!length(_currency) || _currency !~ /^[A-Z]{3}$/)
+        {
+            printf \"Currency is missing or in incorrect format in logs.\n\" > \"/dev/stderr\"
+            exit 1
+        }
+
+        if (!length(_price) || _price !~ /^([+-]?[0-9]+(\.[0-9]+))$/)
+        {
+            printf \"Price is missing or in incorrect format in logs.\n\" > \"/dev/stderr\"
+            exit 1
+        }
+
         if (\$1 == user && (after_time == \"\" || \$2 > after_time) && (before_time == \"\" || \$2 < before_time))
         {
             if (currency == \"\")
@@ -211,6 +176,13 @@ filter_input() {
         }
     }"
     )
+
+    error="$?"
+
+    if [ "$error" -ne 0 ]; then
+        echo ""
+        exit "$error"
+    fi
 
     # if list is empty dont go through commands or it'll break
     if [ -z "$LIST" ]; then
@@ -273,8 +245,7 @@ show_output() {
 
 main() {
     parse_arguments "$@"
-    check_logs_format
-    filter_input
+    check_format_and_filter_input
     show_output
     exit 0
 }
