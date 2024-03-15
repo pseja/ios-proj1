@@ -18,7 +18,7 @@ print_help() {
 }
 
 check_datetime_format() {
-    if date -d "$1" "+%Y-%m-%d %H:%M:%S" >/dev/null; then
+    if echo "$1" | grep -Eq "^([0-9]{4})-([0-9]{2})-([0-9]{2}) ([0-9]{2}):([0-9]{2}):([0-9]{2})$" && date -d "$1" "+%Y-%m-%d %H:%M:%S" >/dev/null; then
         return 0
     else
         echo "Invalid DATETIME format." >&2
@@ -83,7 +83,14 @@ parse_arguments() {
             ;;
 
         *.gz)
-            LOG_INPUT="${LOG_INPUT}\n$(gzip -d -c "$1")"
+            if [ -z "$USER" ]; then
+                USER="$1"
+            else
+                if ! LOG_INPUT="${LOG_INPUT}\n$(zcat "$1")"; then
+                    echo "" && echo "Error reading file $1" >&2
+                    exit 4
+                fi
+            fi
             shift
             ;;
 
@@ -130,7 +137,6 @@ check_format_and_filter_input() {
         _currency = \$3
         _price = \$4
 
-        # DEBUG PRINT
         # printf \"User: '%s', Datetime: '%s', Currency: '%s', Price: '%s'\n\", _user, _datetime, _currency, _price > \"/dev/stderr\";
 
         if (!length(_user))
