@@ -1,5 +1,8 @@
 # 1. Úloha IOS (2024)
 
+### Výsledné hodnocení
+(15.5/15) + 0,5 bodů za bonusovou funkcionalitu, -1 bonusový bod za špatný návratový kód (nedařilo se mi vždycky vrátit správnou hodnotu ze subshellu při exitu awku, jinak by to bylo 16,5 bodů celkem)
+
 ## Popis úlohy
 
 Jako správní technologičtí vizionáři se i Vaše firma rozhodla vytvořit svou vlastní kryptoměnovou burzu, nazvanou XTF (eXtortion, Travesty, Fraud). Burza svým klientům umožňuje vkládat finanční prostředky ve formě kryptoměn i fiat měn; provádět směnu svých prostředků za měny jiné; úschovu prostředků a půjčování prostředků (tzv. _margin_).
